@@ -4,9 +4,10 @@ from fastapi import Depends
 import os
 from faker import Faker
 from app.config import config
-# TODO: remember to import all the DB models here
-from app.models.registration import Registration  # NOQA
 
+from app.models.registration import Registration  # NOQA
+from app.models.user import User  # importiamo il modello User per creare la tabella utenti
+from app.models.event import Event  # importiamo il modello Event per creare la tabella eventi
 
 sqlite_file_name = config.root_dir / "data/database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
