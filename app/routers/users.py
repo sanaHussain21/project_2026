@@ -3,6 +3,7 @@ from sqlmodel import select  # strumento per interrogare il database
 from app.models.user import User  # il modello User che abbiamo creato
 from app.models.registration import Registration  # serve per eliminare le registrazioni a cascata
 from app.data.db import SessionDep  # la connessione al database
+from app.schemas import UserInput
 
 # creiamo il router che raggruppa tutte le API degli utenti
 router = APIRouter()
@@ -17,17 +18,16 @@ def get_users(session: SessionDep):
 
 
 @router.post("/users")
-def create_user(user: User, session: SessionDep):
+def create_user(user: UserInput, session: SessionDep):
     """Crea un nuovo utente. Restituisce errore se lo username esiste già."""
-    # controlliamo se esiste già un utente con questo username
     existing = session.get(User, user.username)
     if existing:
         raise HTTPException(status_code=409, detail="Username già esistente")
-    session.add(user)
+    new_user = User(username=user.username, name=user.name, email=user.email)
+    session.add(new_user)
     session.commit()
-    session.refresh(user)
-    return user
-
+    session.refresh(new_user)
+    return new_user
 
 @router.get("/users/{username}")
 def get_user(username: str, session: SessionDep):

@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends  # strumenti FastAPI per creare le API
-from sqlmodel import Session, select  # strumenti per interrogare il database
-from app.models.event import Event  # il modello Event che abbiamo creato
-from app.models.user import User  # il modello User che abbiamo creato
-from app.models.registration import Registration  # il modello Registration già esistente
-from app.data.db import SessionDep  # la connessione al database
 from datetime import datetime
-# creiamo il router: è come un "blocco" che raggruppa tutte le API degli eventi
-router = APIRouter()
+from fastapi import APIRouter, HTTPException
+from sqlmodel import Session, select
+from app.models.event import Event
+from app.models.user import User
+from app.models.registration import Registration
+from app.data.db import SessionDep
+from app.schemas import EventInput  # importiamo lo schema di validazione
+from app.schemas import UserInput
 
+router = APIRouter()
 
 @router.get("/events")
 def get_events(session: SessionDep):
@@ -18,13 +19,8 @@ def get_events(session: SessionDep):
 
 
 @router.post("/events")
-def create_event(event: Event, session: SessionDep):
+def create_event(event: EventInput, session: SessionDep):
     """Crea un nuovo evento nel database."""
-    # creiamo un nuovo oggetto Event con i dati ricevuti
-    # convertiamo la data da stringa a datetime se necessario
-    if isinstance(event.date, str):
-        event.date = datetime.fromisoformat(event.date)
-    # creiamo un oggetto nuovo per evitare problemi con la sessione
     new_event = Event(
         title=event.title,
         description=event.description,
@@ -35,6 +31,7 @@ def create_event(event: Event, session: SessionDep):
     session.commit()
     session.refresh(new_event)
     return new_event
+
   
 
 
@@ -50,13 +47,11 @@ def get_event(id: int, session: SessionDep):
 
 
 @router.put("/events/{id}")
-def update_event(id: int, updated_event: Event, session: SessionDep):
+def update_event(id: int, updated_event: EventInput, session: SessionDep):
     """Aggiorna un evento esistente."""
-    # cerchiamo l'evento da aggiornare
     event = session.get(Event, id)
     if not event:
         raise HTTPException(status_code=404, detail="Evento non trovato")
-    # aggiorniamo i campi con i nuovi valori
     event.title = updated_event.title
     event.description = updated_event.description
     event.date = updated_event.date
@@ -65,20 +60,21 @@ def update_event(id: int, updated_event: Event, session: SessionDep):
     session.refresh(event)
     return event
 
-
 @router.post("/events/{id}/register")
-def register_to_event(id: int, user: User, session: SessionDep):
+def register_to_event(id: int, user: UserInput, session: SessionDep):
     """Registra un utente a un evento. Se l'utente non esiste, lo crea."""
-    # verifichiamo che l'evento esista
     event = session.get(Event, id)
     if not event:
         raise HTTPException(status_code=404, detail="Evento non trovato")
-    # se l'utente non esiste nel database, lo creiamo
     existing_user = session.get(User, user.username)
     if not existing_user:
-        session.add(user)
+        new_user = User(username=user.username, name=user.name, email=user.email)
+        session.add(new_user)
         session.commit()
-    # creiamo la registrazione che collega utente ed evento
+    # gestiamo la registrazione duplicata senza errore 500
+    existing_reg = session.get(Registration, (user.username, id))
+    if existing_reg:
+        return {"message": "Utente già registrato"}
     registration = Registration(username=user.username, event_id=id)
     session.add(registration)
     session.commit()
